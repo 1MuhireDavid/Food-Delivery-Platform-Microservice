@@ -7,19 +7,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Restaurant entity — part of the Restaurant domain.
- *
- * MONOLITH PROBLEM: Direct @ManyToOne to Customer (as owner)
- * and @OneToMany to MenuItem and Order. In microservices,
- * the Restaurant Service should only store ownerId (Long)
- * and validate via REST call to Customer Service.
- */
 @Entity
 @Table(name = "restaurants")
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Restaurant {
 
     @Id
@@ -37,28 +30,22 @@ public class Restaurant {
     private String city;
     private String phone;
 
-    private boolean active;
+    @Builder.Default
+    private boolean active = true;
 
-    @Column(nullable = false)
-    private double rating;
+    @Builder.Default
+    private double rating = 0.0;
 
     private int estimatedDeliveryMinutes;
 
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(nullable = false)
+    private String ownerUsername;
 
-    // ---- CROSS-DOMAIN RELATIONSHIPS (monolith anti-pattern) ----
-    @Column(name = "owner_id", nullable = false)
-    private Long ownerId;
+    @Column(nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<MenuItem> menuItems = new ArrayList<>();
-
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        if (rating == 0) rating = 0.0;
-        active = true;
-    }
 }

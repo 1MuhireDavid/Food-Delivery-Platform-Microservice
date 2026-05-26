@@ -1,6 +1,6 @@
 package com.david.restaurant_service.repository;
 
-import com.fooddelivery.model.MenuItem;
+import com.david.restaurant_service.model.MenuItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

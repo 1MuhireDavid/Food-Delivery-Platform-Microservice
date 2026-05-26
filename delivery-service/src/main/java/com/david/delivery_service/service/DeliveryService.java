@@ -1,9 +1,10 @@
 package com.david.delivery_service.service;
 
-import com.fooddelivery.dto.DeliveryResponse;
-import com.fooddelivery.exception.ResourceNotFoundException;
-import com.fooddelivery.model.*;
-import com.fooddelivery.repository.DeliveryRepository;
+import com.david.delivery_service.dto.DeliveryResponse;
+import com.david.delivery_service.event.OrderPlacedEvent;
+import com.david.delivery_service.exception.ResourceNotFoundException;
+import com.david.delivery_service.model.Delivery;
+import com.david.delivery_service.repository.DeliveryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -11,57 +12,53 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * MONOLITH COUPLING: DeliveryService directly accesses Order entity
- * (and through it, Customer and Restaurant entities).
- *
- * In microservices:
- *  - Delivery Service subscribes to OrderPlacedEvent via RabbitMQ
- *  - Stores orderId, customerAddress, restaurantAddress as local data
- *  - Publishes DeliveryStatusUpdatedEvent when status changes
- *  - No direct dependency on Order, Customer, or Restaurant entities
- */
 @Service
 public class DeliveryService {
 
     private static final Logger log = LoggerFactory.getLogger(DeliveryService.class);
 
-    private final DeliveryRepository deliveryRepository;
-
-    // Simulated driver pool — in reality this would be its own service
     private static final String[] DRIVERS = {
-            "Carlos Martinez", "Sarah Johnson", "Mike Chen", "Priya Patel", "James Wilson"
+        "James Mwangi", "Grace Wanjiku", "Brian Otieno",
+        "Aisha Kamau", "Patrick Ndungu"
     };
     private static final String[] PHONES = {
-            "+1-555-0101", "+1-555-0102", "+1-555-0103", "+1-555-0104", "+1-555-0105"
+        "+254700111001", "+254700111002", "+254700111003",
+        "+254700111004", "+254700111005"
     };
+
+    private final DeliveryRepository deliveryRepository;
 
     public DeliveryService(DeliveryRepository deliveryRepository) {
         this.deliveryRepository = deliveryRepository;
     }
 
-    /**
-     * MONOLITH PROBLEM: Called SYNCHRONOUSLY from OrderService.placeOrder().
-     * This blocks the order response until delivery is assigned.
-     *
-     * In microservices: Delivery Service consumes OrderPlacedEvent
-     * from RabbitMQ and creates the delivery ASYNCHRONOUSLY.
-     */
     @Transactional
-    public DeliveryResponse createForOrder(Long orderId,
-                                           String pickupAddress,
-                                           String deliveryAddress) {
-        String[] drivers = {"Alice", "Bob", "Carlos", "Diana"};
-        String driver = drivers[new Random().nextInt(drivers.length)];
+    public void createForOrder(OrderPlacedEvent event) {
+        if (deliveryRepository.findByOrderId(event.orderId()).isPresent()) {
+            log.warn("Delivery already exists for orderId={}, skipping", event.orderId());
+            return;
+        }
 
-        Delivery delivery = new Delivery();
-        delivery.setOrderId(orderId);
-        delivery.setPickupAddress(pickupAddress);
-        delivery.setDeliveryAddress(deliveryAddress);
-        delivery.setDriverName(driver);
-        delivery.setAssignedAt(LocalDateTime.now());
+        int idx = (int) (Math.random() * DRIVERS.length);
 
-        return toResponse(deliveryRepository.save(delivery));
+        Delivery delivery = Delivery.builder()
+                .orderId(event.orderId())
+                .customerUsername(event.customerUsername())
+                .pickupAddress(event.restaurantAddress())
+                .deliveryAddress(event.deliveryAddress())
+                .driverName(DRIVERS[idx])
+                .driverPhone(PHONES[idx])
+                .status(Delivery.DeliveryStatus.ASSIGNED)
+                .assignedAt(LocalDateTime.now())
+                .build();
+
+        deliveryRepository.save(delivery);
+        log.info("Delivery created for orderId={}, driver={}", event.orderId(), DRIVERS[idx]);
+    }
+
+    @Transactional(readOnly = true)
+    public DeliveryResponse getById(Long id) {
+        return DeliveryResponse.fromEntity(findEntity(id));
     }
 
     @Transactional(readOnly = true)
@@ -72,54 +69,48 @@ public class DeliveryService {
     }
 
     @Transactional(readOnly = true)
-    public DeliveryResponse getById(Long deliveryId) {
-        Delivery delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", deliveryId));
-        return DeliveryResponse.fromEntity(delivery);
+    public List<DeliveryResponse> getByStatus(String status) {
+        Delivery.DeliveryStatus ds = Delivery.DeliveryStatus.valueOf(status.toUpperCase());
+        return deliveryRepository.findByStatus(ds)
+                .stream().map(DeliveryResponse::fromEntity).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<DeliveryResponse> getByStatus(String status) {
-        Delivery.DeliveryStatus deliveryStatus = Delivery.DeliveryStatus.valueOf(status.toUpperCase());
-        return deliveryRepository.findByStatus(deliveryStatus)
+    public List<DeliveryResponse> getMyDeliveries(String customerUsername) {
+        return deliveryRepository.findByCustomerUsername(customerUsername)
                 .stream().map(DeliveryResponse::fromEntity).toList();
     }
 
     @Transactional
-    public DeliveryResponse updateStatus(Long deliveryId, String status) {
-        Delivery delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", deliveryId));
-
+    public DeliveryResponse updateStatus(Long id, String status) {
+        Delivery delivery = findEntity(id);
         Delivery.DeliveryStatus newStatus = Delivery.DeliveryStatus.valueOf(status.toUpperCase());
+
         delivery.setStatus(newStatus);
 
         switch (newStatus) {
             case PICKED_UP -> delivery.setPickedUpAt(LocalDateTime.now());
-            case DELIVERED -> {
-                delivery.setDeliveredAt(LocalDateTime.now());
-                // MONOLITH: directly updating Order status from Delivery domain
-                delivery.getOrder().setStatus(Order.OrderStatus.DELIVERED);
-            }
+            case DELIVERED -> delivery.setDeliveredAt(LocalDateTime.now());
             default -> {}
         }
-
-        // MONOLITH PROBLEM: synchronous notification
-        log.info("NOTIFICATION: Delivery #{} status changed to {} — "
-                        + "Customer: {} {}",
-                deliveryId, newStatus,
-                delivery.getOrder().getCustomer().getFirstName(),  // CROSS-DOMAIN
-                delivery.getOrder().getCustomer().getLastName());  // CROSS-DOMAIN
 
         return DeliveryResponse.fromEntity(deliveryRepository.save(delivery));
     }
 
     @Transactional
-    public void cancelDelivery(Long deliveryId) {
-        Delivery delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", deliveryId));
-        delivery.setStatus(Delivery.DeliveryStatus.FAILED);
-        deliveryRepository.save(delivery);
+    public DeliveryResponse cancelDelivery(Long orderId) {
+        Delivery delivery = deliveryRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", "orderId", orderId));
 
-        log.info("NOTIFICATION: Delivery #{} cancelled", deliveryId);
+        if (delivery.getStatus() == Delivery.DeliveryStatus.DELIVERED)
+            throw new IllegalStateException("Cannot cancel a completed delivery");
+
+        delivery.setStatus(Delivery.DeliveryStatus.CANCELLED);
+        return DeliveryResponse.fromEntity(deliveryRepository.save(delivery));
+    }
+
+    private Delivery findEntity(Long id) {
+        return deliveryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
     }
 }

@@ -1,7 +1,7 @@
 package com.david.restaurant_service.controller;
 
-import com.fooddelivery.dto.*;
-import com.fooddelivery.service.RestaurantService;
+import com.david.restaurant_service.dto.*;
+import com.david.restaurant_service.service.RestaurantService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +20,7 @@ public class RestaurantController {
         this.restaurantService = restaurantService;
     }
 
-    // ---- Public endpoints (no auth required) ----
+    // ---- Public ----
 
     @GetMapping("/search/city/{city}")
     public ResponseEntity<List<RestaurantResponse>> searchByCity(@PathVariable String city) {
@@ -47,11 +47,12 @@ public class RestaurantController {
         return ResponseEntity.ok(restaurantService.getMenu(id));
     }
 
-    // ---- Authenticated endpoints (restaurant owner) ----
+    // ---- Authenticated (restaurant owner) ----
 
     @PostMapping
     public ResponseEntity<RestaurantResponse> create(
-            Authentication auth, @Valid @RequestBody RestaurantRequest request) {
+            Authentication auth,
+            @Valid @RequestBody RestaurantRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(restaurantService.createRestaurant(auth.getName(), request));
     }
@@ -78,5 +79,18 @@ public class RestaurantController {
             @PathVariable Long itemId, Authentication auth) {
         restaurantService.toggleMenuItemAvailability(itemId, auth.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    // ---- Internal — called by Order Service via Feign (no auth required) ----
+
+    @GetMapping("/internal/{id}")
+    public ResponseEntity<RestaurantResponse> getByIdInternal(@PathVariable Long id) {
+        return ResponseEntity.ok(restaurantService.getById(id));
+    }
+
+    @GetMapping("/internal/menu-item/{itemId}")
+    public ResponseEntity<MenuItemResponse> getMenuItemInternal(@PathVariable Long itemId) {
+        return ResponseEntity.ok(
+                MenuItemResponse.fromEntity(restaurantService.findMenuItemEntityById(itemId)));
     }
 }

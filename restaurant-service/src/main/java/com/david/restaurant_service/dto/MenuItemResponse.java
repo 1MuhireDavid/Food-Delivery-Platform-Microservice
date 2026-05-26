@@ -1,10 +1,13 @@
 package com.david.restaurant_service.dto;
 
-import com.fooddelivery.model.MenuItem;
+import com.david.restaurant_service.model.MenuItem;
+import lombok.Builder;
 import lombok.Data;
+
 import java.math.BigDecimal;
 
 @Data
+@Builder
 public class MenuItemResponse {
     private Long id;
     private String name;
@@ -14,19 +17,17 @@ public class MenuItemResponse {
     private boolean available;
     private String imageUrl;
     private Long restaurantId;
-    private String restaurantName;
 
     public static MenuItemResponse fromEntity(MenuItem m) {
-        MenuItemResponse dto = new MenuItemResponse();
-        dto.setId(m.getId());
-        dto.setName(m.getName());
-        dto.setDescription(m.getDescription());
-        dto.setPrice(m.getPrice());
-        dto.setCategory(m.getCategory());
-        dto.setAvailable(m.isAvailable());
-        dto.setImageUrl(m.getImageUrl());
-        dto.setRestaurantId(m.getRestaurant().getId());
-        dto.setRestaurantName(m.getRestaurant().getName());
-        return dto;
+        return MenuItemResponse.builder()
+                .id(m.getId())
+                .name(m.getName())
+                .description(m.getDescription())
+                .price(m.getPrice())
+                .category(m.getCategory())
+                .available(m.isAvailable())
+                .imageUrl(m.getImageUrl())
+                .restaurantId(m.getRestaurant().getId())
+                .build();
     }
 }

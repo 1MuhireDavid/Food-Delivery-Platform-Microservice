@@ -4,25 +4,12 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-/**
- * Delivery entity — part of the Delivery domain.
- *
- * MONOLITH PROBLEM: Direct @OneToOne to Order entity and
- * delivery assignment happens SYNCHRONOUSLY inside the
- * OrderService.placeOrder() method. This blocks the order
- * response until delivery is assigned.
- *
- * In microservices:
- *  - Store orderId as a Long reference
- *  - Delivery Service subscribes to OrderPlacedEvent via RabbitMQ
- *  - Assignment happens ASYNCHRONOUSLY after the order is confirmed
- *  - Delivery Service publishes DeliveryStatusUpdatedEvent
- */
 @Entity
 @Table(name = "deliveries")
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Delivery {
 
     @Id
@@ -31,32 +18,31 @@ public class Delivery {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private DeliveryStatus status;
+    @Builder.Default
+    private DeliveryStatus status = DeliveryStatus.PENDING;
+
+    @Column(nullable = false, unique = true)
+    private Long orderId;
+
+    @Column(nullable = false)
+    private String customerUsername;
 
     private String driverName;
     private String driverPhone;
 
+    @Column(nullable = false)
     private String pickupAddress;
+
+    @Column(nullable = false)
     private String deliveryAddress;
+
+    @Column(nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime assignedAt;
     private LocalDateTime pickedUpAt;
     private LocalDateTime deliveredAt;
-
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    // ---- CROSS-DOMAIN RELATIONSHIP (monolith anti-pattern) ----
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false, unique = true)
-    private Order order;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        if (status == null) status = DeliveryStatus.PENDING;
-    }
 
     public enum DeliveryStatus {
         PENDING,
@@ -64,6 +50,7 @@ public class Delivery {
         PICKED_UP,
         IN_TRANSIT,
         DELIVERED,
+        CANCELLED,
         FAILED
     }
 }

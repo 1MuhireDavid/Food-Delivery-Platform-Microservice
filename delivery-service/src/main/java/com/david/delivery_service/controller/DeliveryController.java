@@ -1,8 +1,9 @@
 package com.david.delivery_service.controller;
 
-import com.fooddelivery.dto.DeliveryResponse;
-import com.fooddelivery.service.DeliveryService;
+import com.david.delivery_service.dto.DeliveryResponse;
+import com.david.delivery_service.service.DeliveryService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -26,14 +27,24 @@ public class DeliveryController {
         return ResponseEntity.ok(deliveryService.getByOrderId(orderId));
     }
 
-    @GetMapping("/status/{status}")
-    public ResponseEntity<List<DeliveryResponse>> getByStatus(@PathVariable String status) {
+    @GetMapping
+    public ResponseEntity<List<DeliveryResponse>> getByStatus(@RequestParam String status) {
         return ResponseEntity.ok(deliveryService.getByStatus(status));
+    }
+
+    @GetMapping("/my-deliveries")
+    public ResponseEntity<List<DeliveryResponse>> getMyDeliveries(Authentication auth) {
+        return ResponseEntity.ok(deliveryService.getMyDeliveries(auth.getName()));
     }
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<DeliveryResponse> updateStatus(
             @PathVariable Long id, @RequestParam String status) {
         return ResponseEntity.ok(deliveryService.updateStatus(id, status));
+    }
+
+    @PostMapping("/order/{orderId}/cancel")
+    public ResponseEntity<DeliveryResponse> cancel(@PathVariable Long orderId) {
+        return ResponseEntity.ok(deliveryService.cancelDelivery(orderId));
     }
 }

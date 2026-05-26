@@ -1,49 +1,40 @@
 package com.david.delivery_service.dto;
 
-import com.fooddelivery.model.Delivery;
+import com.david.delivery_service.model.Delivery;
+import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
+@Builder
 public class DeliveryResponse {
     private Long id;
     private String status;
+    private Long orderId;
+    private String customerUsername;
     private String driverName;
     private String driverPhone;
     private String pickupAddress;
     private String deliveryAddress;
+    private LocalDateTime createdAt;
     private LocalDateTime assignedAt;
     private LocalDateTime pickedUpAt;
     private LocalDateTime deliveredAt;
-    private LocalDateTime createdAt;
-
-    // MONOLITH: cross-domain order info embedded
-    private Long orderId;
-    private String orderStatus;
-    private Long customerId;
-    private String customerName;
-    private String restaurantName;
 
     public static DeliveryResponse fromEntity(Delivery d) {
-        DeliveryResponse dto = new DeliveryResponse();
-        dto.setId(d.getId());
-        dto.setStatus(d.getStatus().name());
-        dto.setDriverName(d.getDriverName());
-        dto.setDriverPhone(d.getDriverPhone());
-        dto.setPickupAddress(d.getPickupAddress());
-        dto.setDeliveryAddress(d.getDeliveryAddress());
-        dto.setAssignedAt(d.getAssignedAt());
-        dto.setPickedUpAt(d.getPickedUpAt());
-        dto.setDeliveredAt(d.getDeliveredAt());
-        dto.setCreatedAt(d.getCreatedAt());
-
-        // MONOLITH: cross-domain entity traversal
-        dto.setOrderId(d.getOrder().getId());
-        dto.setOrderStatus(d.getOrder().getStatus().name());
-        dto.setCustomerId(d.getOrder().getCustomer().getId());
-        dto.setCustomerName(d.getOrder().getCustomer().getFirstName()
-                + " " + d.getOrder().getCustomer().getLastName());
-        dto.setRestaurantName(d.getOrder().getRestaurant().getName());
-        return dto;
+        return DeliveryResponse.builder()
+                .id(d.getId())
+                .status(d.getStatus().name())
+                .orderId(d.getOrderId())
+                .customerUsername(d.getCustomerUsername())
+                .driverName(d.getDriverName())
+                .driverPhone(d.getDriverPhone())
+                .pickupAddress(d.getPickupAddress())
+                .deliveryAddress(d.getDeliveryAddress())
+                .createdAt(d.getCreatedAt())
+                .assignedAt(d.getAssignedAt())
+                .pickedUpAt(d.getPickedUpAt())
+                .deliveredAt(d.getDeliveredAt())
+                .build();
     }
 }

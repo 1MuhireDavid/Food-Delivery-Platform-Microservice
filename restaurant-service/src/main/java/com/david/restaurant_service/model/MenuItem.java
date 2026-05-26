@@ -5,18 +5,12 @@ import lombok.*;
 
 import java.math.BigDecimal;
 
-/**
- * MenuItem entity — part of the Restaurant domain.
- *
- * This entity stays with Restaurant in the microservices split.
- * The coupling problem here is that OrderItem directly references
- * MenuItem via JPA, which must become an ID reference + REST call.
- */
 @Entity
 @Table(name = "menu_items")
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MenuItem {
 
     @Id
@@ -33,18 +27,12 @@ public class MenuItem {
 
     private String category;
 
-    private boolean available;
+    @Builder.Default
+    private boolean available = true;
 
     private String imageUrl;
-
-    // ---- SAME-DOMAIN RELATIONSHIP (this is fine) ----
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_id", nullable = false)
     private Restaurant restaurant;
-
-    @PrePersist
-    protected void onCreate() {
-        available = true;
-    }
 }

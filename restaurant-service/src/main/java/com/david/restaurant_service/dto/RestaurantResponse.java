@@ -1,10 +1,13 @@
 package com.david.restaurant_service.dto;
 
-import com.fooddelivery.model.Restaurant;
+import com.david.restaurant_service.model.Restaurant;
+import lombok.Builder;
 import lombok.Data;
-import java.util.List;
+
+import java.time.LocalDateTime;
 
 @Data
+@Builder
 public class RestaurantResponse {
     private Long id;
     private String name;
@@ -16,28 +19,23 @@ public class RestaurantResponse {
     private boolean active;
     private double rating;
     private int estimatedDeliveryMinutes;
-    private int menuItemCount;
-
-    // MONOLITH: owner info embedded via direct entity traversal
-    private Long ownerId;
-    private String ownerName;
+    private String ownerUsername;
+    private LocalDateTime createdAt;
 
     public static RestaurantResponse fromEntity(Restaurant r) {
-        RestaurantResponse dto = new RestaurantResponse();
-        dto.setId(r.getId());
-        dto.setName(r.getName());
-        dto.setDescription(r.getDescription());
-        dto.setCuisineType(r.getCuisineType());
-        dto.setAddress(r.getAddress());
-        dto.setCity(r.getCity());
-        dto.setPhone(r.getPhone());
-        dto.setActive(r.isActive());
-        dto.setRating(r.getRating());
-        dto.setEstimatedDeliveryMinutes(r.getEstimatedDeliveryMinutes());
-        dto.setMenuItemCount(r.getMenuItems() != null ? r.getMenuItems().size() : 0);
-        // MONOLITH: cross-domain entity traversal
-        dto.setOwnerId(r.getOwner().getId());
-        dto.setOwnerName(r.getOwner().getFirstName() + " " + r.getOwner().getLastName());
-        return dto;
+        return RestaurantResponse.builder()
+                .id(r.getId())
+                .name(r.getName())
+                .description(r.getDescription())
+                .cuisineType(r.getCuisineType())
+                .address(r.getAddress())
+                .city(r.getCity())
+                .phone(r.getPhone())
+                .active(r.isActive())
+                .rating(r.getRating())
+                .estimatedDeliveryMinutes(r.getEstimatedDeliveryMinutes())
+                .ownerUsername(r.getOwnerUsername())
+                .createdAt(r.getCreatedAt())
+                .build();
     }
 }
