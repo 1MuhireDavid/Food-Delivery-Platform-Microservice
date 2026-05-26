@@ -1,0 +1,27 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/order_db
+    username: postgres
+    password: yourpassword
+  jpa:
+    hibernate:
+      ddl-auto: update
+  eureka:
+    client:
+      service-url:
+        defaultZone: http://localhost:8761/eureka/
+    instance:
+      prefer-ip-address: true
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+  app:
+    jwt:
+      secret: "myMonolithSecretKeyThatShouldBeExternalizedInMicroservices2024FoodDelivery!"

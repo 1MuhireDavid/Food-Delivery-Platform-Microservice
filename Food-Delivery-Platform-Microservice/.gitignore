@@ -1,0 +1,24 @@
+# Target directories (compiled code)
+**/target/
+*.jar
+*.war
+
+# IDE specific files
+**/.idea/
+**/*.iml
+**/.classpath
+**/.project
+**/.settings/
+**/.vscode/
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Local database storage (if you map volumes in Docker)
+**/postgres-data/
+**/mysql-data/
+**/rabbitmq-data/
+
+# Local environment variables
+.env
