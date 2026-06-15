@@ -1,0 +1,10 @@
+eureka:
+  client:
+    service-url:
+      defaultZone: "${EUREKA_URI:http://eureka:8761/eureka/}"
+  instance:
+    prefer-ip-address: true
+
+app:
+  jwt:
+    secret: "${JWT_SECRET:myMonolithSecretKeyThatShouldBeExternalizedInMicroservices2024FoodDelivery!}"

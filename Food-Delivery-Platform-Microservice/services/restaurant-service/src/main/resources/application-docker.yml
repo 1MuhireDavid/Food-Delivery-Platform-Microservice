@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: "${DB_URL:jdbc:postgresql://postgres:5432/restaurant_db}"
+    driver-class-name: org.postgresql.Driver
+    username: "${DB_USERNAME:postgres}"
+    password: "${DB_PASSWORD:rwanda}"
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+  h2:
+    console:
+      enabled: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: "${EUREKA_URI:http://eureka:8761/eureka/}"
+  instance:
+    prefer-ip-address: true

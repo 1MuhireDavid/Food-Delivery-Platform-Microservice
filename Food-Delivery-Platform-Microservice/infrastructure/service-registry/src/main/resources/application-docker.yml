@@ -1,0 +1,6 @@
+eureka:
+  instance:
+    hostname: eureka
+    prefer-ip-address: false
+  server:
+    wait-time-in-ms-when-sync-empty: 0
