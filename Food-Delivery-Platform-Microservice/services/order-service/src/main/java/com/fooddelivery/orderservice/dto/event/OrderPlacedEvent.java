@@ -17,6 +17,7 @@ public class OrderPlacedEvent {
     private Long orderId;
     private Long customerId;
     private Long restaurantId;
+    private String customerUsername;
     private String customerName;
     private String deliveryAddress;
     private String restaurantAddress;

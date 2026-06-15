@@ -1,14 +1,19 @@
 package com.david.delivery_service.service;
 
+import com.david.delivery_service.config.RabbitMQConfig;
 import com.david.delivery_service.dto.DeliveryResponse;
+import com.david.delivery_service.event.DeliveryStatusUpdatedEvent;
 import com.david.delivery_service.event.OrderPlacedEvent;
 import com.david.delivery_service.exception.ResourceNotFoundException;
 import com.david.delivery_service.model.Delivery;
 import com.david.delivery_service.repository.DeliveryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,9 +32,11 @@ public class DeliveryService {
     };
 
     private final DeliveryRepository deliveryRepository;
+    private final RabbitTemplate rabbitTemplate;
 
-    public DeliveryService(DeliveryRepository deliveryRepository) {
+    public DeliveryService(DeliveryRepository deliveryRepository, RabbitTemplate rabbitTemplate) {
         this.deliveryRepository = deliveryRepository;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     @Transactional
@@ -94,7 +101,27 @@ public class DeliveryService {
             default -> {}
         }
 
-        return DeliveryResponse.fromEntity(deliveryRepository.save(delivery));
+        Delivery saved = deliveryRepository.save(delivery);
+
+        if (newStatus == Delivery.DeliveryStatus.PICKED_UP
+                || newStatus == Delivery.DeliveryStatus.DELIVERED) {
+            DeliveryStatusUpdatedEvent event = new DeliveryStatusUpdatedEvent(
+                    saved.getId(),
+                    saved.getOrderId(),
+                    newStatus.name(),
+                    saved.getDriverName(),
+                    Instant.now()
+            );
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.DELIVERY_EXCHANGE,
+                    RabbitMQConfig.DELIVERY_STATUS_KEY,
+                    event
+            );
+            log.info("Published DeliveryStatusUpdatedEvent for orderId={}, status={}",
+                    saved.getOrderId(), newStatus);
+        }
+
+        return DeliveryResponse.fromEntity(saved);
     }
 
     @Transactional

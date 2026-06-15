@@ -1,6 +1,7 @@
 package com.fooddelivery.orderservice.exception;
 
 import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -32,6 +33,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArg(IllegalArgumentException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleServiceUnavailable(ServiceUnavailableException ex) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ResponseEntity<Map<String, Object>> handleCircuitOpen(CallNotPermittedException ex) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "Service temporarily unavailable (circuit breaker open): " + ex.getCausingCircuitBreakerName());
     }
 
     @ExceptionHandler(FeignException.NotFound.class)

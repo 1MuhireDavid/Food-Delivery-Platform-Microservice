@@ -1,5 +1,7 @@
 package com.david.restaurant_service.exception;
 
+import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -25,6 +27,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<Map<String, String>> handleDuplicate(DuplicateResourceException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<Map<String, String>> handleServiceUnavailable(ServiceUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ResponseEntity<Map<String, String>> handleCircuitOpen(CallNotPermittedException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "Service temporarily unavailable (circuit breaker open): "
+                        + ex.getCausingCircuitBreakerName()));
+    }
+
+    @ExceptionHandler(FeignException.class)
+    public ResponseEntity<Map<String, String>> handleFeignError(FeignException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "Upstream service unavailable: " + ex.status()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

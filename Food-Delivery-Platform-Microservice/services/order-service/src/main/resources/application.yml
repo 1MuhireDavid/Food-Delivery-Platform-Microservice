@@ -33,8 +33,34 @@ eureka:
   instance:
     prefer-ip-address: true
 
+spring:
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+        group:
+          enabled: true   # groups all methods of a Feign client under one CB instance
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+  health:
+    circuitbreakers:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always

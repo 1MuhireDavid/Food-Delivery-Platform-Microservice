@@ -11,11 +11,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String EXCHANGE        = "order.exchange";
-    public static final String PLACED_QUEUE    = "order.placed.queue";
-    public static final String CANCELLED_QUEUE = "order.cancelled.queue";
-    public static final String PLACED_KEY      = "order.placed";
-    public static final String CANCELLED_KEY   = "order.cancelled";
+    public static final String EXCHANGE          = "order.exchange";
+    public static final String PLACED_QUEUE      = "order.placed.queue";
+    public static final String CANCELLED_QUEUE   = "order.cancelled.queue";
+    public static final String PLACED_KEY        = "order.placed";
+    public static final String CANCELLED_KEY     = "order.cancelled";
+
+    public static final String DEAD_LETTER_EXCHANGE  = "order.dlx";
+    public static final String DLQ_PLACED_KEY        = "order.placed.dlq";
+    public static final String DLQ_CANCELLED_KEY     = "order.cancelled.dlq";
 
     @Bean
     public TopicExchange orderExchange() {
@@ -23,13 +27,24 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(DEAD_LETTER_EXCHANGE, true, false);
+    }
+
+    @Bean
     public Queue orderPlacedQueue() {
-        return QueueBuilder.durable(PLACED_QUEUE).build();
+        return QueueBuilder.durable(PLACED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", DLQ_PLACED_KEY)
+                .build();
     }
 
     @Bean
     public Queue orderCancelledQueue() {
-        return QueueBuilder.durable(CANCELLED_QUEUE).build();
+        return QueueBuilder.durable(CANCELLED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", DLQ_CANCELLED_KEY)
+                .build();
     }
 
     @Bean

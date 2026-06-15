@@ -110,6 +110,7 @@ public class OrderService {
                 .orderId(saved.getId())
                 .customerId(customerId)
                 .restaurantId(request.getRestaurantId())
+                .customerUsername(customer.getUsername())
                 .customerName(customer.getFullName())
                 .deliveryAddress(deliveryAddress)
                 .restaurantAddress(restaurant.getAddress())

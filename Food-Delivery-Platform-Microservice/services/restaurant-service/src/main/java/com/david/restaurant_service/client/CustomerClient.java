@@ -1,10 +1,11 @@
 package com.david.restaurant_service.client;
 
+import com.david.restaurant_service.client.fallback.CustomerClientFallbackFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(name = "customer-service")
+@FeignClient(name = "customer-service", fallbackFactory = CustomerClientFallbackFactory.class)
 public interface CustomerClient {
 
     @PatchMapping("/api/customers/internal/{username}/promote-to-owner")
