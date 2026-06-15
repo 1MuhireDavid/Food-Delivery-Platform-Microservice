@@ -37,6 +37,10 @@ eureka:
 app:
   jwt:
     secret: "myMonolithSecretKeyThatShouldBeExternalizedInMicroservices2024FoodDelivery!"
+  rate-limiter:
+    order-placement:
+      limit-for-period: 20          # max requests per refresh window
+      limit-refresh-period-seconds: 1
 
 management:
   endpoints:
