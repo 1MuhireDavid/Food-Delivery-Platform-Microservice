@@ -11,19 +11,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    // -- Order events (consuming) --
     public static final String ORDER_EXCHANGE        = "order.exchange";
     public static final String ORDER_PLACED_QUEUE    = "order.placed.queue";
     public static final String ORDER_PLACED_KEY      = "order.placed";
     public static final String ORDER_CANCELLED_QUEUE = "order.cancelled.queue";
     public static final String ORDER_CANCELLED_KEY   = "order.cancelled";
 
-    // -- Dead letter --
     public static final String DEAD_LETTER_EXCHANGE  = "order.dlx";
     public static final String DLQ_ORDER_PLACED      = "order.placed.dlq";
     public static final String DLQ_ORDER_CANCELLED   = "order.cancelled.dlq";
 
-    // -- Delivery status events (publishing) --
     public static final String DELIVERY_EXCHANGE     = "delivery.exchange";
     public static final String DELIVERY_STATUS_QUEUE = "delivery.status.queue";
     public static final String DELIVERY_STATUS_KEY   = "delivery.status";
@@ -43,7 +40,6 @@ public class RabbitMQConfig {
         return new TopicExchange(DELIVERY_EXCHANGE, true, false);
     }
 
-    // Queues with dead-letter forwarding
     @Bean
     public Queue orderPlacedQueue() {
         return QueueBuilder.durable(ORDER_PLACED_QUEUE)
@@ -60,7 +56,6 @@ public class RabbitMQConfig {
                 .build();
     }
 
-    // Dead-letter queues — parking lot for failed messages
     @Bean
     public Queue deadLetterOrderPlacedQueue() {
         return QueueBuilder.durable(DLQ_ORDER_PLACED).build();
@@ -76,7 +71,6 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(DELIVERY_STATUS_QUEUE).build();
     }
 
-    // Bindings
     @Bean
     public Binding orderPlacedBinding(Queue orderPlacedQueue, TopicExchange orderExchange) {
         return BindingBuilder.bind(orderPlacedQueue).to(orderExchange).with(ORDER_PLACED_KEY);
