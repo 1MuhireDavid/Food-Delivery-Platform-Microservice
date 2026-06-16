@@ -55,8 +55,6 @@ public class DeliveryService {
                 .deliveryAddress(event.deliveryAddress())
                 .driverName(DRIVERS[idx])
                 .driverPhone(PHONES[idx])
-                .status(Delivery.DeliveryStatus.ASSIGNED)
-                .assignedAt(LocalDateTime.now())
                 .build();
 
         deliveryRepository.save(delivery);
@@ -96,6 +94,7 @@ public class DeliveryService {
         delivery.setStatus(newStatus);
 
         switch (newStatus) {
+            case ASSIGNED  -> delivery.setAssignedAt(LocalDateTime.now());
             case PICKED_UP -> delivery.setPickedUpAt(LocalDateTime.now());
             case DELIVERED -> delivery.setDeliveredAt(LocalDateTime.now());
             default -> {}

@@ -2,57 +2,7 @@
 
 ## Component Diagram
 
-```
-┌───────────────────────────────────────────────────────────┐
-│  HTTP Client                                               │
-└──────────────────────────┬────────────────────────────────┘
-                           │
-                           ▼
-┌───────────────────────────────────────────────────────────┐
-│  API Gateway  :8080                                        │
-│                                                            │
-│  JwtAuthenticationFilter  (GlobalFilter, order = -1)       │
-│    validates HS256 signature · rejects 401 on failure      │
-│    injects: X-Username · X-User-Role · X-Customer-Id       │
-│                                                            │
-│  OrderRateLimiterFilter   (GlobalFilter, order = 0)        │
-│    POST /api/orders only · 20 permits/second               │
-│    non-blocking (timeoutDuration = ZERO) · 429 on breach   │
-└──────┬──────────────────────────────────────────┬─────────┘
-       │  Eureka load-balanced routing             │
-       ▼                                           ▼
-┌──────────────────┐  ┌────────────────┐  ┌───────────────┐  ┌──────────────────┐
-│ Customer  :8081  │  │ Restaurant :8082│  │  Order  :8083 │  │ Delivery  :8084  │
-│                  │  │                │  │               │  │                  │
-│ Auth, Profiles   │  │ Restaurants    │  │ Orders        │  │ Deliveries       │
-│ H2 / pg customer │  │ Menus          │  │ Events        │  │ Driver tracking  │
-│                  │  │ H2 / pg rest.  │  │ PostgreSQL    │  │ H2 / pg delivery │
-└──────────────────┘  └────────────────┘  └───────┬───────┘  └────────┬─────────┘
-         ▲                    ▲                    │ Feign             │
-         │                    │                    ▼                   │
-         └────────────────────┴──────── (CustomerClient)               │
-         ▲                                         │ Feign             │
-         │                            (RestaurantClient)               │
-         └────────────────────────────────────────┘                   │
-                                                                        │
-         ┌──────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌───────────────────────────────────────────────────────────┐
-│  RabbitMQ  :5672                                           │
-│                                                            │
-│  order.exchange  (topic, durable)                          │
-│    order.placed     → order.placed.queue     (Delivery)    │
-│    order.cancelled  → order.cancelled.queue  (Delivery)    │
-│                                                            │
-│  order.dlx  (direct, dead-letter)                          │
-│    order.placed.dlq                                        │
-│    order.cancelled.dlq                                     │
-│                                                            │
-│  delivery.exchange  (topic, durable)                       │
-│    delivery.status  → delivery.status.queue                │
-└───────────────────────────────────────────────────────────┘
-```
+<img width="2720" height="3600" alt="food_delivery_architecture_detailed" src="https://github.com/user-attachments/assets/71c24902-277f-437a-8d15-018a0cf54646" />
 
 ## Request Flow — Placing an Order
 
@@ -128,11 +78,11 @@ GET  /actuator/**
 ```
                   failure rate ≥ 50%
                   (over 10-call window)
-  CLOSED ─────────────────────────────────► OPEN
+  CLOSED ─-------------------------------─► OPEN
     ▲                                         │
     │                                         │  wait 5 s
     │                                         ▼
-    └──────────────────────────────────── HALF-OPEN
+    └-------------------------------------- HALF-OPEN
           3 probe calls succeed            (3 probes)
 ```
 
