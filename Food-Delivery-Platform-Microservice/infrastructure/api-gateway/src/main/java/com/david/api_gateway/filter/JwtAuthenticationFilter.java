@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -25,12 +26,18 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
-    private static final List<String> PUBLIC_PATHS = List.of(
+    // Paths that are public regardless of HTTP method
+    private static final List<String> ALWAYS_PUBLIC = List.of(
             "/api/auth/register",
             "/api/auth/login",
+            "/actuator/**"
+    );
+
+    // Paths that are public for GET requests only
+    private static final List<String> GET_PUBLIC = List.of(
             "/api/restaurants/search/**",
             "/api/restaurants/*/menu",
-            "/actuator/**"
+            "/api/restaurants/*"
     );
 
     @Override
@@ -41,8 +48,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
+        HttpMethod method = exchange.getRequest().getMethod();
 
-        if (isPublicPath(path)) {
+        if (isPublicPath(path, method)) {
             return chain.filter(exchange);
         }
 
@@ -77,7 +85,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
     }
 
-    private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
+    private boolean isPublicPath(String path, HttpMethod method) {
+        if (ALWAYS_PUBLIC.stream().anyMatch(p -> pathMatcher.match(p, path))) {
+            return true;
+        }
+        return HttpMethod.GET.equals(method)
+                && GET_PUBLIC.stream().anyMatch(p -> pathMatcher.match(p, path));
     }
 }

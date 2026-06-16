@@ -3,6 +3,7 @@ package com.david.restaurant_service.config;
 import com.david.restaurant_service.security.GatewayHeaderFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -24,9 +25,9 @@ public class SecurityConfig {
                 s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .addFilterBefore(gatewayHeaderFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/restaurants/search/**").permitAll()
-                .requestMatchers("/api/restaurants/*/menu").permitAll()
-                .requestMatchers("/api/restaurants/search/all").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/restaurants/search/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/restaurants/*/menu").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/restaurants/*").permitAll()
                 .requestMatchers("/api/restaurants/internal/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
