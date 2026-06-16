@@ -4,13 +4,11 @@ server:
 spring:
   application:
     name: order-service
-
   datasource:
     url: jdbc:postgresql://localhost:5432/order_db
     username: postgres
     password: rwanda
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -19,12 +17,17 @@ spring:
       hibernate:
         format_sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-
   rabbitmq:
     host: localhost
     port: 5672
     username: guest
     password: guest
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+        group:
+          enabled: true
 
 eureka:
   client:
@@ -32,14 +35,6 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
-
-spring:
-  cloud:
-    openfeign:
-      circuitbreaker:
-        enabled: true
-        group:
-          enabled: true   # groups all methods of a Feign client under one CB instance
 
 resilience4j:
   circuitbreaker:

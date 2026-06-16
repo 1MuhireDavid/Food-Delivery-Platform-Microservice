@@ -1,7 +1,6 @@
 package com.david.restaurant_service.client.fallback;
 
 import com.david.restaurant_service.client.CustomerClient;
-import com.david.restaurant_service.exception.ServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FallbackFactory;
@@ -18,8 +17,9 @@ public class CustomerClientFallbackFactory implements FallbackFactory<CustomerCl
         return new CustomerClient() {
             @Override
             public void promoteToRestaurantOwner(String username) {
-                throw new ServiceUnavailableException(
-                        "Customer Service is temporarily unavailable. Cannot update customer role.");
+                // Promotion is a best-effort side effect; log and continue so restaurant creation succeeds.
+                log.warn("Could not promote {} to RESTAURANT_OWNER — Customer Service unavailable: {}",
+                        username, cause.getMessage());
             }
         };
     }

@@ -16,6 +16,12 @@ spring:
   h2:
     console:
       enabled: true
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+        group:
+          enabled: true
 
 eureka:
   client:
@@ -23,14 +29,6 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
-
-spring:
-  cloud:
-    openfeign:
-      circuitbreaker:
-        enabled: true
-        group:
-          enabled: true
 
 resilience4j:
   circuitbreaker:
