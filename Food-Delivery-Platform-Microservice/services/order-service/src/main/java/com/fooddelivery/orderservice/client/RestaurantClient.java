@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 @FeignClient(name = "restaurant-service", fallbackFactory = RestaurantClientFallbackFactory.class)
 public interface RestaurantClient {
 
-    @GetMapping("/api/restaurants/{id}")
+    @GetMapping("/api/restaurants/internal/{id}")
     RestaurantInfo getById(@PathVariable Long id);
 
-    @GetMapping("/api/restaurants/menu-items/{menuItemId}")
+    @GetMapping("/api/restaurants/internal/menu-item/{menuItemId}")
     MenuItemInfo getMenuItemById(@PathVariable Long menuItemId);
 }

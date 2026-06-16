@@ -9,9 +9,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 @FeignClient(name = "customer-service", fallbackFactory = CustomerClientFallbackFactory.class)
 public interface CustomerClient {
 
-    @GetMapping("/api/customers/{id}")
+    @GetMapping("/api/customers/internal/{id}")
     CustomerInfo getById(@PathVariable Long id);
-
-    @GetMapping("/api/customers/by-username/{username}")
-    CustomerInfo getByUsername(@PathVariable String username);
 }

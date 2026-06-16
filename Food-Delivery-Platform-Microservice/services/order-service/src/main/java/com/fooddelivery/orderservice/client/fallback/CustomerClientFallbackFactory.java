@@ -22,12 +22,6 @@ public class CustomerClientFallbackFactory implements FallbackFactory<CustomerCl
                 throw new ServiceUnavailableException(
                         "Customer Service is temporarily unavailable. Please try again later.");
             }
-
-            @Override
-            public CustomerInfo getByUsername(String username) {
-                throw new ServiceUnavailableException(
-                        "Customer Service is temporarily unavailable. Please try again later.");
-            }
         };
     }
 }
