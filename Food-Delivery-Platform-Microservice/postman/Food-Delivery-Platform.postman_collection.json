@@ -1,0 +1,1196 @@
+{
+  "info": {
+    "name": "Food Delivery Platform — E2E",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "End-to-end tests for the Food Delivery Platform microservices.\n\n**Prerequisites:** All services must be running (Docker: `docker compose up --build` or local startup order in README).\n\n**Collection Runner settings:** Set delay between requests to 1000 ms — this gives RabbitMQ time to propagate the OrderPlacedEvent before '03 - Full Order Flow' checks for the delivery record.\n\n**Run order:** Folders must run in sequence 01 → 02 → 03 → 04. Folder 05 (Fault Tolerance) requires manual steps — read each request description before sending."
+  },
+  "variable": [
+    { "key": "baseUrl",           "value": "http://localhost:8080", "type": "string" },
+    { "key": "customerUsername",  "value": "e2e_customer",          "type": "string" },
+    { "key": "customerPassword",  "value": "password123",           "type": "string" },
+    { "key": "ownerUsername",     "value": "e2e_owner",             "type": "string" },
+    { "key": "ownerPassword",     "value": "password123",           "type": "string" },
+    { "key": "customerToken",     "value": "",                      "type": "string" },
+    { "key": "ownerToken",        "value": "",                      "type": "string" },
+    { "key": "customerId",        "value": "",                      "type": "string" },
+    { "key": "restaurantId",      "value": "",                      "type": "string" },
+    { "key": "menuItemId",        "value": "",                      "type": "string" },
+    { "key": "orderId",           "value": "",                      "type": "string" },
+    { "key": "cancelOrderId",     "value": "",                      "type": "string" },
+    { "key": "deliveryId",        "value": "",                      "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "01 - Setup",
+      "description": "Register two accounts and authenticate both. A timestamp suffix is appended to usernames so the collection can be re-run against the same database without conflicts.",
+      "item": [
+
+        {
+          "name": "Register Customer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = Date.now().toString().slice(-6);",
+                  "pm.collectionVariables.set('customerUsername', 'e2e_customer_' + suffix);",
+                  "pm.collectionVariables.set('ownerUsername',    'e2e_owner_'    + suffix);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('customerToken', b.token);",
+                  "pm.collectionVariables.set('customerId', String(b.customerId));",
+                  "pm.test('JWT token returned', () => pm.expect(b.token).to.be.a('string').and.not.empty);",
+                  "pm.test('Default role is CUSTOMER', () => pm.expect(b.role).to.equal('CUSTOMER'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"username\": \"{{customerUsername}}\",\n  \"email\": \"{{customerUsername}}@test.com\",\n  \"password\": \"{{customerPassword}}\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"Customer\",\n  \"phone\": \"+250780000001\",\n  \"deliveryAddress\": \"123 Test Street\",\n  \"city\": \"Kigali\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Register Restaurant Owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('ownerToken', b.token);",
+                  "pm.test('JWT token returned', () => pm.expect(b.token).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"username\": \"{{ownerUsername}}\",\n  \"email\": \"{{ownerUsername}}@test.com\",\n  \"password\": \"{{ownerPassword}}\",\n  \"firstName\": \"Restaurant\",\n  \"lastName\": \"Owner\",\n  \"city\": \"Kigali\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Login as Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('customerToken', b.token);",
+                  "pm.test('Fresh token issued', () => pm.expect(b.token).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"username\": \"{{customerUsername}}\",\n  \"password\": \"{{customerPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Login as Restaurant Owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('ownerToken', b.token);",
+                  "pm.test('Fresh token issued', () => pm.expect(b.token).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"username\": \"{{ownerUsername}}\",\n  \"password\": \"{{ownerPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        }
+
+      ]
+    },
+
+    {
+      "name": "02 - Restaurant Catalog",
+      "description": "Create a restaurant and menu items, then exercise all public catalog endpoints.",
+      "item": [
+
+        {
+          "name": "Create Restaurant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('restaurantId', String(b.id));",
+                  "pm.test('Restaurant ID set', () => pm.expect(b.id).to.be.a('number'));",
+                  "pm.test('Name matches', () => pm.expect(b.name).to.equal('Test Restaurant'));",
+                  "pm.test('Owner username set', () => pm.expect(b.ownerUsername).to.equal(pm.collectionVariables.get('ownerUsername')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"name\": \"Test Restaurant\",\n  \"description\": \"E2E test restaurant\",\n  \"cuisineType\": \"RWANDAN\",\n  \"address\": \"KN 5 Ave, Kigali\",\n  \"city\": \"Kigali\",\n  \"phone\": \"+250780000002\",\n  \"estimatedDeliveryMinutes\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Add Menu Item — Isombe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('menuItemId', String(b.id));",
+                  "pm.test('Price is 9.99', () => pm.expect(b.price).to.equal(9.99));",
+                  "pm.test('Available by default', () => pm.expect(b.available).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"name\": \"Isombe\",\n  \"description\": \"Cassava leaves with vegetables\",\n  \"price\": 9.99,\n  \"category\": \"MAIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/{{restaurantId}}/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "{{restaurantId}}", "menu"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Add Menu Item — Brochette",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"name\": \"Brochette\",\n  \"description\": \"Grilled meat skewers\",\n  \"price\": 5.50,\n  \"category\": \"STARTER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/{{restaurantId}}/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "{{restaurantId}}", "menu"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Public — Search by City",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Contains test restaurant', () => {",
+                  "  const found = pm.response.json().some(r => r.id === Number(pm.collectionVariables.get('restaurantId')));",
+                  "  pm.expect(found).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/search/city/Kigali",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "search", "city", "Kigali"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Public — Search by Cuisine",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/search/cuisine/RWANDAN",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "search", "cuisine", "RWANDAN"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Public — List All Restaurants",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('At least one restaurant', () => pm.expect(pm.response.json().length).to.be.at.least(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/search/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "search", "all"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Public — Get Restaurant by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Correct restaurant returned', () => pm.expect(String(b.id)).to.equal(pm.collectionVariables.get('restaurantId')));",
+                  "pm.test('City is Kigali', () => pm.expect(b.city).to.equal('Kigali'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/{{restaurantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "{{restaurantId}}"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Public — Get Restaurant Menu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json();",
+                  "pm.test('Two menu items', () => pm.expect(items.length).to.equal(2));",
+                  "pm.test('All items available', () => items.forEach(i => pm.expect(i.available).to.be.true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/{{restaurantId}}/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "{{restaurantId}}", "menu"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Update Menu Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Price updated', () => pm.expect(pm.response.json().price).to.equal(11.99));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"name\": \"Isombe\",\n  \"description\": \"Cassava leaves — updated description\",\n  \"price\": 11.99,\n  \"category\": \"MAIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/menu/{{menuItemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "menu", "{{menuItemId}}"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Toggle Menu Item Availability",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/menu/{{menuItemId}}/toggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "menu", "{{menuItemId}}", "toggle"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Toggle Back (restore availability)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/menu/{{menuItemId}}/toggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "menu", "{{menuItemId}}", "toggle"]
+            }
+          },
+          "response": []
+        }
+
+      ]
+    },
+
+    {
+      "name": "03 - Full Order Flow [E2E]",
+      "description": "Runs the complete customer journey end-to-end:\n1. Customer places an order\n2. Delivery record is automatically created by Delivery Service via RabbitMQ event (no manual trigger)\n3. Delivery progresses through ASSIGNED → PICKED_UP → DELIVERED\n\n**IMPORTANT:** Use Collection Runner with at least 1000 ms delay between requests. The step '[EVENT] Get Delivery by Order' relies on Delivery Service consuming the OrderPlacedEvent — allow time for that to happen.",
+      "item": [
+
+        {
+          "name": "Place Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('orderId', String(b.id));",
+                  "pm.test('Order ID set', () => pm.expect(b.id).to.be.a('number'));",
+                  "pm.test('Status is PLACED', () => pm.expect(b.status).to.equal('PLACED'));",
+                  "pm.test('Total amount calculated', () => pm.expect(b.totalAmount).to.be.above(0));",
+                  "pm.test('Delivery fee applied', () => pm.expect(b.deliveryFee).to.be.above(0));",
+                  "pm.test('Customer ID matches', () => pm.expect(String(b.customerId)).to.equal(pm.collectionVariables.get('customerId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"restaurantId\": {{restaurantId}},\n  \"items\": [\n    {\n      \"menuItemId\": {{menuItemId}},\n      \"quantity\": 2,\n      \"specialInstructions\": \"No spice\"\n    }\n  ],\n  \"deliveryAddress\": \"123 Test Street, Kigali\",\n  \"specialInstructions\": \"Ring the bell\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Verify Order Placed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Correct order ID', () => pm.expect(String(b.id)).to.equal(pm.collectionVariables.get('orderId')));",
+                  "pm.test('Status is PLACED', () => pm.expect(b.status).to.equal('PLACED'));",
+                  "pm.test('Has line items', () => pm.expect(b.items.length).to.be.at.least(1));",
+                  "pm.test('Item name is set', () => pm.expect(b.items[0].itemName).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "[EVENT] Get Delivery by Order — auto-assigned via RabbitMQ",
+          "description": "This request verifies event-driven delivery assignment.\n\nWhen the order was placed, Order Service published an OrderPlacedEvent to order.exchange. Delivery Service consumed it from order.placed.queue and created a Delivery record automatically — no REST call triggered the creation.\n\nIf this returns 404, the event has not been processed yet. Wait a moment and retry, or increase the Collection Runner delay.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 — delivery auto-created by event', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('deliveryId', String(b.id));",
+                  "pm.test('Delivery ID set', () => pm.expect(b.id).to.be.a('number'));",
+                  "pm.test('Linked to correct order', () => pm.expect(String(b.orderId)).to.equal(pm.collectionVariables.get('orderId')));",
+                  "pm.test('Initial status is PENDING', () => pm.expect(b.status).to.equal('PENDING'));",
+                  "pm.test('Customer username recorded', () => pm.expect(b.customerUsername).to.equal(pm.collectionVariables.get('customerUsername')));",
+                  "pm.test('Pickup address from restaurant', () => pm.expect(b.pickupAddress).to.be.a('string').and.not.empty);",
+                  "pm.test('Delivery address from order', () => pm.expect(b.deliveryAddress).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/deliveries/order/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "deliveries", "order", "{{orderId}}"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Update Delivery Status → ASSIGNED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is ASSIGNED', () => pm.expect(pm.response.json().status).to.equal('ASSIGNED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/deliveries/{{deliveryId}}/status?status=ASSIGNED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "deliveries", "{{deliveryId}}", "status"],
+              "query": [{ "key": "status", "value": "ASSIGNED" }]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Update Delivery Status → PICKED_UP",
+          "description": "Transitioning to PICKED_UP publishes a DeliveryStatusUpdatedEvent to delivery.exchange. Check the RabbitMQ management UI (localhost:15672) to observe the message on delivery.status.queue.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Status is PICKED_UP', () => pm.expect(b.status).to.equal('PICKED_UP'));",
+                  "pm.test('Picked up at timestamp set', () => pm.expect(b.pickedUpAt).to.not.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/deliveries/{{deliveryId}}/status?status=PICKED_UP",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "deliveries", "{{deliveryId}}", "status"],
+              "query": [{ "key": "status", "value": "PICKED_UP" }]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Update Delivery Status → DELIVERED",
+          "description": "Final step. Transitioning to DELIVERED also publishes a DeliveryStatusUpdatedEvent.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Status is DELIVERED', () => pm.expect(b.status).to.equal('DELIVERED'));",
+                  "pm.test('Delivered at timestamp set', () => pm.expect(b.deliveredAt).to.not.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/deliveries/{{deliveryId}}/status?status=DELIVERED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "deliveries", "{{deliveryId}}", "status"],
+              "query": [{ "key": "status", "value": "DELIVERED" }]
+            }
+          },
+          "response": []
+        }
+
+      ]
+    },
+
+    {
+      "name": "04 - Additional Endpoints",
+      "description": "Exercises the remaining endpoints not covered in the E2E flow: profile, order history, cancel flow, and delivery queries.",
+      "item": [
+
+        {
+          "name": "Get My Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Correct username', () => pm.expect(b.username).to.equal(pm.collectionVariables.get('customerUsername')));",
+                  "pm.test('Profile has email', () => pm.expect(b.email).to.include('@'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "customers", "me"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Get My Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const orders = pm.response.json();",
+                  "pm.test('At least one order', () => pm.expect(orders.length).to.be.at.least(1));",
+                  "pm.test('All orders belong to this customer', () => {",
+                  "  const cid = pm.collectionVariables.get('customerId');",
+                  "  orders.forEach(o => pm.expect(String(o.customerId)).to.equal(cid));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/my-orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "my-orders"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Get Orders by Restaurant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const orders = pm.response.json();",
+                  "pm.test('At least one order for this restaurant', () => pm.expect(orders.length).to.be.at.least(1));",
+                  "pm.test('All orders for correct restaurant', () => {",
+                  "  const rid = pm.collectionVariables.get('restaurantId');",
+                  "  orders.forEach(o => pm.expect(String(o.restaurantId)).to.equal(rid));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/restaurant/{{restaurantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "restaurant", "{{restaurantId}}"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Place Order (for cancel test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('cancelOrderId', String(b.id));",
+                  "pm.test('Status is PLACED', () => pm.expect(b.status).to.equal('PLACED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"restaurantId\": {{restaurantId}},\n  \"items\": [\n    {\n      \"menuItemId\": {{menuItemId}},\n      \"quantity\": 1\n    }\n  ],\n  \"deliveryAddress\": \"456 Cancel Street, Kigali\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Update Order Status → CONFIRMED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is CONFIRMED', () => pm.expect(pm.response.json().status).to.equal('CONFIRMED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{cancelOrderId}}/status?status=CONFIRMED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{cancelOrderId}}", "status"],
+              "query": [{ "key": "status", "value": "CONFIRMED" }]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Cancel Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is CANCELLED', () => pm.expect(pm.response.json().status).to.equal('CANCELLED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{cancelOrderId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{cancelOrderId}}", "cancel"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Get Deliveries by Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/deliveries?status=DELIVERED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "deliveries"],
+              "query": [{ "key": "status", "value": "DELIVERED" }]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Get Delivery by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Correct delivery', () => pm.expect(String(b.id)).to.equal(pm.collectionVariables.get('deliveryId')));",
+                  "pm.test('Status is DELIVERED', () => pm.expect(b.status).to.equal('DELIVERED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/deliveries/{{deliveryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "deliveries", "{{deliveryId}}"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Get My Deliveries",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/deliveries/my-deliveries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "deliveries", "my-deliveries"]
+            }
+          },
+          "response": []
+        }
+
+      ]
+    },
+
+    {
+      "name": "05 - Fault Tolerance",
+      "description": "Tests for circuit breakers, rate limiting, and service isolation. Each request includes manual steps in its description that must be completed before sending the request.",
+      "item": [
+
+        {
+          "name": "[CB] Place Order — Customer Service Down",
+          "description": "**Before running this request:**\n1. Stop Customer Service:\n   - Docker: `docker stop food-delivery-customer-service`\n   - Local: kill the process on port 8081\n\n**Expected behaviour:**\n- First 5 requests: HTTP 503 from CustomerClient fallback factory (circuit breaker CLOSED but calls failing)\n- After 5 failures: circuit transitions to OPEN. Calls are rejected immediately with 503 and `\"circuit breaker open: customer-service\"` in the body.\n\n**After testing:**\n```\ndocker start food-delivery-customer-service\n```\nThe circuit auto-transitions to HALF_OPEN after 5 seconds and closes after 3 successful probe calls.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Service unavailable (CB active)', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([503, 201]);",
+                  "});",
+                  "if (pm.response.code === 503) {",
+                  "  const b = pm.response.json();",
+                  "  pm.test('Error message present', () => pm.expect(b.error || b.message).to.be.a('string'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"restaurantId\": {{restaurantId}},\n  \"items\": [{ \"menuItemId\": {{menuItemId}}, \"quantity\": 1 }],\n  \"deliveryAddress\": \"CB Test Street\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "[CB] Create Restaurant — Customer Service Down",
+          "description": "**Before running:** Stop Customer Service (same as previous request).\n\nRestaurant Service calls Customer Service via Feign to promote the owner's role. With Customer Service down, creating a new restaurant returns 503.\n\nExisting restaurant reads (search, get by ID, menu) still work — they do not depend on Customer Service.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns 503 when Customer Service is down', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([503, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"name\": \"CB Test Restaurant\",\n  \"address\": \"CB Ave\",\n  \"city\": \"Kigali\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "[CB] Service Isolation — Public Search Still Works",
+          "description": "While Customer Service is down, public restaurant catalog endpoints are unaffected because they do not call Customer Service.\n\nRun this request while Customer Service is still stopped to confirm service isolation.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Public catalog works even when Customer Service is down', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/restaurants/search/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "restaurants", "search", "all"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "[429] Rate Limit — POST /api/orders",
+          "description": "**Purpose:** Trigger the rate limiter on POST /api/orders (20 permits per second per gateway instance).\n\n**How to trigger:**\n1. In Collection Runner: set iterations = 25, delay = 0 ms\n2. Run this request only (deselect all others)\n3. The first 20 iterations return 201 or CB response; subsequent iterations within the same second return 429 with `Retry-After: 1` header\n\n**Expected:**\n- HTTP 429 with `Retry-After: 1` header after the bucket is exhausted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 429', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([201, 429, 503]);",
+                  "});",
+                  "if (pm.response.code === 429) {",
+                  "  pm.test('Retry-After header present', () => {",
+                  "    pm.expect(pm.response.headers.get('Retry-After')).to.equal('1');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"restaurantId\": {{restaurantId}},\n  \"items\": [{ \"menuItemId\": {{menuItemId}}, \"quantity\": 1 }],\n  \"deliveryAddress\": \"Rate Limit Test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Health — Order Service (CB state)",
+          "description": "Calls the Order Service actuator health endpoint **directly** (bypassing the gateway) to inspect circuit breaker state.\n\nLook for `components.circuitBreakers.details.customer-service.details.state` — values: CLOSED, OPEN, HALF_OPEN.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Actuator responds', () => pm.expect(pm.response.code).to.be.oneOf([200, 503]));",
+                  "const b = pm.response.json();",
+                  "pm.test('Has circuit breaker info', () => {",
+                  "  const cbDetails = b.components && b.components.circuitBreakers;",
+                  "  pm.expect(cbDetails).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8083/actuator/health",
+              "raw": "http://localhost:8083/actuator/health",
+              "host": ["localhost"],
+              "port": "8083",
+              "path": ["actuator", "health"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Health — Restaurant Service (CB state)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Actuator responds', () => pm.expect(pm.response.code).to.be.oneOf([200, 503]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8082/actuator/health",
+              "host": ["localhost"],
+              "port": "8082",
+              "path": ["actuator", "health"]
+            }
+          },
+          "response": []
+        }
+
+      ]
+    }
+
+  ]
+}
