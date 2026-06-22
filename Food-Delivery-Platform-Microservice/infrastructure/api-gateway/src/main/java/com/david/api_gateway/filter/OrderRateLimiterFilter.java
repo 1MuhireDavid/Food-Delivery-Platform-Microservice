@@ -1,6 +1,8 @@
 package com.david.api_gateway.filter;
 
 import io.github.resilience4j.ratelimiter.RateLimiter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -12,6 +14,8 @@ import reactor.core.publisher.Mono;
 
 @Component
 public class OrderRateLimiterFilter implements GlobalFilter, Ordered {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderRateLimiterFilter.class);
 
     private final RateLimiter orderPlacementRateLimiter;
 
@@ -32,6 +36,7 @@ public class OrderRateLimiterFilter implements GlobalFilter, Ordered {
         }
 
         if (!orderPlacementRateLimiter.acquirePermission()) {
+            log.warn("Rate limit exceeded: POST /api/orders from {}", exchange.getRequest().getRemoteAddress());
             exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
             exchange.getResponse().getHeaders().add("Retry-After", "1");
             return exchange.getResponse().setComplete();

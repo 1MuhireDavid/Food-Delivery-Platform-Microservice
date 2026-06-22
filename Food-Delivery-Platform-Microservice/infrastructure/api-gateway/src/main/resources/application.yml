@@ -47,3 +47,8 @@ management:
     web:
       exposure:
         include: health,info
+
+logging:
+  level:
+    com.david.api_gateway: INFO
+    org.springframework.cloud.gateway: WARN

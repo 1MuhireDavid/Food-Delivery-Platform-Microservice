@@ -4,6 +4,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -20,6 +22,8 @@ import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     @Value("${app.jwt.secret}")
     private String jwtSecret;
@@ -56,6 +60,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.warn("Missing Authorization header: {} {}", method, path);
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
@@ -69,6 +74,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException e) {
+            log.warn("Invalid JWT for {} {}: {}", method, path, e.getMessage());
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
@@ -85,6 +91,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if (customerIdClaim != null) {
             mutate.header("X-Customer-Id", customerIdClaim.toString());
         }
+
+        log.debug("Authenticated: user={} role={} for {} {}", username, role, method, path);
 
         ServerHttpRequest mutatedRequest = mutate.build();
 
